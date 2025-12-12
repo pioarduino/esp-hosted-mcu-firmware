@@ -93,6 +93,7 @@ jobs:
     permissions:
       contents: write
     strategy:
+      fail-fast: false
       matrix:
         target:
            - esp32
