@@ -36,7 +36,7 @@ jobs:
           - esp32c3
           - esp32c5
           - esp32c6
-#          - esp32c61
+          - esp32c61
 
     steps:
       - name: Checkout
@@ -103,7 +103,7 @@ jobs:
            - esp32c3
            - esp32c5
            - esp32c6
-#           - esp32c61
+           - esp32c61
 
     steps:
       - name: Generate manifest
