@@ -18,12 +18,14 @@ The following table summarizes the supported co-processors and transport communi
 | ESP32-C3 | × | ✓ | ✓ | ✓ |
 | ESP32-C5 | ✓ | ✓ | ✓ | ✓ |
 | ESP32-C6/C61 | ✓ | ✓ | ✓ | ✓ |
-| ESP32-S2 | × | ✓ | ✓ | ✓ |
+| ESP32-S2[^1] | × | ✓ | ✓ | ✓ |
 | ESP32-S3 | × | ✓ | ✓ | ✓ |
 
 ## Usage
 
 Download the appropriate firmware binary for your co-processor from the [Releases](https://github.com/pioarduino/esp-hosted-mcu-firmware/releases) page
+
+[^1]: Build currently fails due to an incorrect default configuration
 
 ## Building Locally
 
