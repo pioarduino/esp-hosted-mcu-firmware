@@ -161,3 +161,78 @@ jobs:
             --clobber \
             ${{ matrix.target }}.json
 
+  deploy-pages:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Get latest release
+        id: get_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" --json tagName,isLatest -q '.[] | select(.isLatest == true) | .tagName')
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Download all bin files from latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p public
+          gh release download "${{ steps.get_release.outputs.latest_tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.bin" \
+            --dir public
+
+      - name: Create index.html
+        run: |
+          cat > public/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>ESP-Hosted MCU Firmware</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; }
+              h1 { color: #333; }
+              ul { list-style-type: none; padding: 0; }
+              li { margin: 10px 0; }
+              a { color: #0366d6; text-decoration: none; }
+              a:hover { text-decoration: underline; }
+            </style>
+          </head>
+          <body>
+            <h1>ESP-Hosted MCU Firmware - Latest Release</h1>
+            <p>Release: ${{ steps.get_release.outputs.latest_tag }}</p>
+            <h2>Available Firmware Files:</h2>
+            <ul>
+          EOF
+          
+          for file in public/*.bin; do
+            filename=$(basename "$file")
+            echo "      <li><a href=\"$filename\">$filename</a></li>" >> public/index.html
+          done
+          
+          cat >> public/index.html << 'EOF'
+            </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'public'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
