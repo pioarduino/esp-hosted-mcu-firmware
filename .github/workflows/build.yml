@@ -232,58 +232,10 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        with:
-          enablement: true
-
-      - name: Ensure `gh-pages` branch exists (create orphan branch if missing)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          echo "Checking for gh-pages branch in $REPO"
-          if gh api repos/${REPO}/git/ref/heads/gh-pages >/dev/null 2>&1; then
-            echo "gh-pages branch already exists"
-          else
-            echo "gh-pages branch not found — creating orphan gh-pages branch"
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-            # Clone the repository using the GITHUB_TOKEN and create an orphan branch
-            CLONE_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-            rm -rf repo-ghpages || true
-            git clone --depth 1 "$CLONE_URL" repo-ghpages
-            cd repo-ghpages
-
-            # Create an empty orphan branch and commit a placeholder file
-            git checkout --orphan gh-pages
-            git rm -rf . || true
-            echo "<!-- GitHub Pages placeholder -->" > index.html
-            git add index.html
-            git commit -m "chore: create gh-pages orphan branch"
-            git push --set-upstream origin gh-pages
-            echo "Created orphan gh-pages branch and pushed to origin"
-          fi
-
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-        with:
-          path: 'public'
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-      - name: Configure Pages site to use `gh-pages` branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -e
-          echo "Configuring Pages to use gh-pages branch for $REPO"
-          # Use the REST API to set Pages source to gh-pages
-          gh api --method PUT /repos/${REPO}/pages -f source='{"branch":"gh-pages","path":"/"}' || {
-            echo "Failed to configure Pages via API (may already be configured or require admin rights)." >&2
-            exit 0
-          }
