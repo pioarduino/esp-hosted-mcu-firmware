@@ -23,7 +23,9 @@ The following table summarizes the supported co-processors and transport communi
 
 ## Usage
 
-Download the appropriate firmware binary for your co-processor from the [Releases](https://github.com/pioarduino/esp-hosted-mcu-firmware/releases) page
+Download the appropriate firmware binary for your co-processor from the [Releases](https://github.com/pioarduino/esp-hosted-mcu-firmware/releases) page.
+
+You can also use the firmware files hosted on the project's GitHub Pages site for over-the-air (OTA) updates to the co-processor. The workflow publishes the latest release `.bin` files to GitHub Pages (https://pioarduino.github.io/esp-hosted-mcu-firmware); point your co-processor's OTA URL to the desired `.bin` file (for example: `https://pioarduino.github.io/esp-hosted-mcu-firmware/network_adapter_esp32c6.bin`).
 
 [^1]: Build currently fails due to an incorrect default configuration
 
