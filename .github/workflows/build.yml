@@ -10,7 +10,7 @@ on:
       version:
         description: 'ESP-Hosted-MCU version to build'
         type: string
-        default: '2.7.3'
+        default: '2.9.3'
       release:
         description: 'Create a release'
         type: boolean
@@ -18,7 +18,7 @@ on:
 
 env:
   ESP_IDF_VERSION: v5.5.1
-  ESP_HOSTED_VERSION: ${{ inputs.version || '2.7.3' }}
+  ESP_HOSTED_VERSION: ${{ inputs.version || '2.9.3' }}
 
 jobs:
   build:
@@ -30,7 +30,7 @@ jobs:
       matrix:
         target:
           - esp32
-#          - esp32s2
+          - esp32s2
           - esp32s3
           - esp32c2
           - esp32c3
@@ -97,7 +97,7 @@ jobs:
       matrix:
         target:
            - esp32
-#           - esp32s2
+           - esp32s2
            - esp32s3
            - esp32c2
            - esp32c3
