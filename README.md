@@ -25,7 +25,7 @@ The following table summarizes the supported co-processors and transport communi
 
 Download the appropriate firmware binary for your co-processor from the [Releases](https://github.com/pioarduino/esp-hosted-mcu-firmware/releases) page.
 
-You can also use the firmware files hosted on the project's GitHub Pages site for over-the-air (OTA) updates to the co-processor. The workflow publishes the latest release `.bin` files to GitHub Pages (https://pioarduino.github.io/esp-hosted-mcu-firmware); point your co-processor's OTA URL to the desired `.bin` file (for example: `https://pioarduino.github.io/esp-hosted-mcu-firmware/network_adapter_esp32c6.bin`).
+You can also use the firmware files hosted on the project's GitHub Pages site for over-the-air (OTA) updates to the co-processor. The workflow publishes the release `.bin` files to GitHub Pages (https://pioarduino.github.io/esp-hosted-mcu-firmware); point your co-processor's OTA URL to the desired `.bin` file (for example: `https://pioarduino.github.io/esp-hosted-mcu-firmware/v2.12.0/network_adapter_esp32c6.bin`).
 
 ## Building Locally
 
@@ -33,14 +33,14 @@ To build the firmware locally:
 
 ```bash
 # Clone ESP-IDF
-git clone -b v5.5.1 --recursive https://github.com/espressif/esp-idf.git
+git clone -b v5.5.3 --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32c6  # or your target
 source export.sh
 cd ..
 
 # Create project from ESP-Hosted example
-idf.py create-project-from-example "espressif/esp_hosted==2.7.3:slave"
+idf.py create-project-from-example "espressif/esp_hosted==2.12.0:slave"
 cd slave/
 
 # Build for your target
@@ -52,7 +52,7 @@ idf.py build
 
 ## Versioning
 
-Releases are tagged with the ESP-Hosted-MCU version used (e.g., `v2.7.3`).
+Releases are tagged with the ESP-Hosted-MCU version used (e.g., `v2.12.0`).
 
 ## License
 
