@@ -86,7 +86,7 @@ jobs:
         with:
           tag_name: v${{ env.ESP_HOSTED_VERSION }}
           files: firmware/*
-          generate_release_notes: true
+          generate_release_notes: false
 
   manifest:
     needs: release
