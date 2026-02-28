@@ -10,7 +10,7 @@ on:
       version:
         description: 'ESP-Hosted-MCU version to build'
         type: string
-        default: '2.9.3'
+        default: '2.12.0'
       release:
         description: 'Create a release'
         type: boolean
@@ -18,7 +18,7 @@ on:
 
 env:
   ESP_IDF_VERSION: v5.5.3
-  ESP_HOSTED_VERSION: ${{ inputs.version || '2.9.3' }}
+  ESP_HOSTED_VERSION: ${{ inputs.version || '2.12.0' }}
 
 jobs:
   build:
@@ -114,6 +114,9 @@ jobs:
         run: |
           TARGET="${{ matrix.target }}"
           REPO="${{ github.repository }}"
+          REPO_OWNER=$(echo "$REPO" | cut -d'/' -f1)
+          REPO_NAME=$(echo "$REPO" | cut -d'/' -f2)
+          BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
 
           # Get all release tags
           TAGS=$(gh release list --repo "$REPO" --json tagName -q '.[].tagName')
@@ -136,7 +139,7 @@ jobs:
               rm -f "$SHA256_FILE"
 
               if [ -n "$SHA256" ] && [ ${#SHA256} -eq 64 ]; then
-                BIN_URL="https://github.com/${REPO}/releases/download/${TAG}/network_adapter_${TARGET}.bin"
+                BIN_URL="${BASE_URL}/${TAG}/network_adapter_${TARGET}.bin"
 
                 # Add to manifest using jq
                 jq --arg ver "$VERSION" --arg url "$BIN_URL" --arg sha "$SHA256" \
@@ -164,10 +167,10 @@ jobs:
             ${{ matrix.target }}.json
 
   deploy-pages:
-    needs: release
+    needs: manifest
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -175,62 +178,105 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Get latest release
-        id: get_release
+      - name: Download all releases and manifests
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          LATEST_TAG=$(gh release list --repo "${{ github.repository }}" --json tagName,isLatest -q '.[] | select(.isLatest == true) | .tagName')
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          mkdir -p public/manifest
 
-      - name: Download all bin files from latest release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p public
-          gh release download "${{ steps.get_release.outputs.latest_tag }}" \
+          # Download manifests
+          gh release download manifest \
             --repo "${{ github.repository }}" \
-            --pattern "*.bin" \
-            --dir public
+            --pattern "*.json" \
+            --dir public/manifest || true
+
+          # Get all release tags (exclude manifest)
+          TAGS=$(gh release list --repo "${{ github.repository }}" --json tagName -q '.[].tagName' | grep -v '^manifest$')
+
+          for TAG in $TAGS; do
+            echo "Downloading $TAG..."
+            mkdir -p "public/$TAG"
+            gh release download "$TAG" \
+              --repo "${{ github.repository }}" \
+              --pattern "*.bin" \
+              --dir "public/$TAG" || true
+          done
 
       - name: Create index.html
         run: |
           REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
-          
-          cat > public/index.html << EOF
+
+          cat > public/index.html << 'HEADER'
           <!DOCTYPE html>
           <html>
           <head>
-            <title>ESP-Hosted MCU Firmware</title>
+            <title>ESP-Hosted Firmware</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 40px; }
+              body { font-family: Arial, sans-serif; margin: 40px; max-width: 900px; }
               h1 { color: #333; }
+              h2 { color: #555; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+              h3 { color: #666; margin-top: 20px; }
               ul { list-style-type: none; padding: 0; }
-              li { margin: 10px 0; }
+              li { margin: 8px 0; }
               a { color: #0366d6; text-decoration: none; }
               a:hover { text-decoration: underline; }
-              .url { font-family: monospace; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; }
+              code { font-family: monospace; font-size: 0.85em; background: #f6f8fa; padding: 2px 6px; border-radius: 3px; }
+              .latest { background: #28a745; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-left: 10px; }
+              .manifest-section { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 30px; }
             </style>
           </head>
           <body>
-            <h1>ESP-Hosted MCU Firmware - Latest Release</h1>
-            <p>Release: ${{ steps.get_release.outputs.latest_tag }}</p>
-            <h2>Available Firmware Files:</h2>
-            <ul>
-          EOF
-          
-          for file in public/*.bin; do
-            filename=$(basename "$file")
-            echo "      <li><a href=\"$filename\">$filename</a> - <span class=\"url\">${BASE_URL}/${filename}</span></li>" >> public/index.html
+            <h1>ESP-Hosted Firmware</h1>
+            <p>Pre-built ESP-Hosted firmware binaries.</p>
+
+            <div class="manifest-section">
+              <h3>Manifests (JSON)</h3>
+              <p>Machine-readable manifests with all versions, URLs, and SHA256 checksums:</p>
+              <ul>
+          HEADER
+
+          for manifest in public/manifest/*.json; do
+            if [ -f "$manifest" ]; then
+              filename=$(basename "$manifest")
+              target="${filename%.json}"
+              echo "        <li><a href=\"manifest/${filename}\">${target}</a> - <code>${BASE_URL}/manifest/${filename}</code></li>" >> public/index.html
+            fi
           done
-          
-          cat >> public/index.html << 'EOF'
-            </ul>
+
+          cat >> public/index.html << 'MIDDLE'
+              </ul>
+            </div>
+
+            <h2>Releases</h2>
+          MIDDLE
+
+          FIRST=true
+          for dir in $(ls -d public/v* 2>/dev/null | sort -V -r); do
+            TAG=$(basename "$dir")
+            echo "    <h3>$TAG" >> public/index.html
+            if [ "$FIRST" = true ]; then
+              echo '<span class="latest">Latest</span>' >> public/index.html
+              FIRST=false
+            fi
+            echo "</h3>" >> public/index.html
+            echo "    <ul>" >> public/index.html
+
+            for file in "$dir"/*.bin; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                echo "      <li><a href=\"${TAG}/${filename}\">${filename}</a> - <code>${BASE_URL}/${TAG}/${filename}</code></li>" >> public/index.html
+              fi
+            done
+
+            echo "    </ul>" >> public/index.html
+          done
+
+          cat >> public/index.html << 'FOOTER'
           </body>
           </html>
-          EOF
+          FOOTER
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
