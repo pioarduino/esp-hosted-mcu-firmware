@@ -5,30 +5,79 @@ on:
     - cron: '0 6 * * *'  # Daily at 6 AM UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Get latest ESP-Hosted version
-        id: latest
-        run: |
-          VERSION=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" | jq -r '[.versions[].version | select(test("(rc|alpha|beta)") | not)][0]')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Latest ESP-Hosted version: $VERSION"
-
-      - name: Get latest release version
-        id: current
+      - name: Determine versions to build
+        id: todo
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(gh release view --repo ${{ github.repository }} --json tagName -q '.tagName' 2>/dev/null | sed 's/^v//' || echo "none")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Current release version: $VERSION"
+          # Stable versions from the ESP component registry (exclude any semver
+          # pre-release, i.e. anything with a '-' identifier like 3.0.0-rc1).
+          AVAILABLE=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" \
+            | jq -r '.versions[].version | select(contains("-") | not)' \
+            | sort -Vu)
 
-      - name: Trigger build if new version
-        if: steps.latest.outputs.version != steps.current.outputs.version
+          # Versions already released (strip leading v, skip manifest tag)
+          RELEASED=$(gh release list --repo "${{ github.repository }}" --limit 200 \
+            --json tagName -q '.[].tagName' \
+            | grep -v '^manifest$' \
+            | sed 's/^v//' \
+            | sort -V)
+
+          # Highest version we've already released. If there are no releases,
+          # bail out — this workflow only builds forward, not historical gaps.
+          HIGHEST=$(echo "$RELEASED" | sort -V | tail -n1)
+          if [ -z "$HIGHEST" ]; then
+            echo "No existing releases; nothing to do (bootstrap a release manually)."
+            MISSING=""
+          else
+            # Missing = stable versions strictly newer than HIGHEST
+            MISSING=$(echo "$AVAILABLE" | awk -v h="$HIGHEST" '
+              function ver_gt(a, b,   as, bs, i, an, bn) {
+                n = split(a, as, "."); split(b, bs, ".")
+                for (i = 1; i <= n; i++) {
+                  an = as[i] + 0; bn = bs[i] + 0
+                  if (an > bn) return 1
+                  if (an < bn) return 0
+                }
+                return 0
+              }
+              ver_gt($0, h)')
+          fi
+
+          # Count non-empty lines
+          COUNT=$(printf '%s\n' "$MISSING" | grep -cve '^$' || true)
+
+          echo "Available stable versions:"
+          echo "$AVAILABLE"
+          echo "Already released:"
+          echo "$RELEASED"
+          echo "Missing versions to build ($COUNT):"
+          echo "$MISSING"
+
+          {
+            echo "count=$COUNT"
+            echo "missing<<EOF"
+            echo "$MISSING"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch build for each missing version
+        if: steps.todo.outputs.count != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "New version available: ${{ steps.latest.outputs.version }}"
-          gh workflow run build.yml --repo ${{ github.repository }} -f version=${{ steps.latest.outputs.version }} -f release=true
+          while IFS= read -r V; do
+            [ -z "$V" ] && continue
+            echo "Dispatching build for $V"
+            gh workflow run build.yml --repo "${{ github.repository }}" \
+              -f version="$V" -f release=true
+            sleep 5
+          done <<< "${{ steps.todo.outputs.missing }}"
