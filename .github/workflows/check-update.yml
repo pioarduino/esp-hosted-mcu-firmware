@@ -12,7 +12,7 @@ jobs:
       - name: Get latest ESP-Hosted version
         id: latest
         run: |
-          VERSION=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" | jq -r '.versions[0].version')
+          VERSION=$(curl -s "https://components.espressif.com/api/components/espressif/esp_hosted" | jq -r '[.versions[].version | select(test("(rc|alpha|beta)") | not)][0]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Latest ESP-Hosted version: $VERSION"
 
