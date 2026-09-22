@@ -115,12 +115,14 @@ jobs:
   manifest:
     needs: release
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: write
     concurrency:
       group: release-publish-${{ matrix.target }}
       cancel-in-progress: false
     strategy:
+      fail-fast: false
       matrix:
         target:
            - esp32
